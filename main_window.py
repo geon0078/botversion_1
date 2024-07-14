@@ -69,8 +69,8 @@ class MainWindow(QMainWindow):
     def check_server_status(self):
         state = self.kiwoom_api.GetConnectState()
         if state == 1:
-            self.setWindowTitle("Kiwoom 실시간 조건식 테스트 - 서버 연결 중")
-            self.label_status.setText("서버에 연결 중입니다.")
+            self.setWindowTitle("Kiwoom 실시간 조건식 테스트 - 서버: 온라인")
+            self.label_status.setText("서버: 온라인")
         else:
             self.setWindowTitle("Kiwoom 실시간 조건식 테스트 - 서버 연결 끊김")
             self.label_status.setText("서버 연결이 끊어졌습니다.")
