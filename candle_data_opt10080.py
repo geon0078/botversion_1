@@ -54,25 +54,30 @@ class CandleDataRetrieverOpt10080(QMainWindow):
         self.CommConnect()
 
     def CommConnect(self):
+        print("CommConnect called")
         self.status_label.setText("Status: Connecting...")
         self.ocx.dynamicCall("CommConnect()")
 
     def _handler_login(self, err_code):
+        print(f"_handler_login called with err_code: {err_code}")
         if err_code == 0:
             self.status_label.setText("Status: Login successful")
         else:
             self.status_label.setText(f"Status: Login failed: {err_code}")
 
     def select_file(self):
+        print("select_file called")
         options = QFileDialog.Options()
         file, _ = QFileDialog.getOpenFileName(self, "Select SQLite File", "", "SQLite Files (*.db);;All Files (*)", options=options)
         if file:
+            print(f"File selected: {file}")
             self.file_label.setText(f"Selected File: {file}")
             self.conn = sqlite3.connect(file)
             self.cursor = self.conn.cursor()
             self.load_stock_codes()
 
     def load_stock_codes(self):
+        print("load_stock_codes called")
         if self.conn:
             self.cursor.execute("SELECT code FROM tracked_stocks")
             rows = self.cursor.fetchall()
@@ -83,6 +88,7 @@ class CandleDataRetrieverOpt10080(QMainWindow):
             print("Loaded stock codes:", self.stock_codes)
 
     def get_candlestick_data(self):
+        print("get_candlestick_data called")
         selected_items = self.stock_list_widget.selectedItems()
         if not selected_items:
             self.status_label.setText("Status: No stock codes selected")
@@ -91,6 +97,7 @@ class CandleDataRetrieverOpt10080(QMainWindow):
         self.table_widget.setRowCount(0)
         self.selected_stock_codes = [item.text() for item in selected_items]
         self.current_stock_index = 0
+        print(f"Selected stock codes: {self.selected_stock_codes}")
         self.request_candlestick_data(self.selected_stock_codes[self.current_stock_index])
 
     def request_candlestick_data(self, stock_code):
@@ -101,32 +108,51 @@ class CandleDataRetrieverOpt10080(QMainWindow):
         self.ocx.dynamicCall("CommRqData(QString, QString, int, QString)", "opt10080_req", "opt10080", 0, "0101")
 
     def _handler_receive_tr_data(self, screen_no, rqname, trcode, recordname, prevnext, data_len, err_code, msg1, msg2):
+        print(f"_handler_receive_tr_data called with rqname: {rqname}, trcode: {trcode}")
         if rqname == "opt10080_req":
-            count = self.ocx.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
-            stock_code = self.selected_stock_codes[self.current_stock_index]
-            for i in range(count):
-                date = self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "일자").strip()
-                time = self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "체결시간").strip()
-                open_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "시가").strip()))
-                high_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "고가").strip()))
-                low_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "저가").strip()))
-                close_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()))
-                volume = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "거래량").strip()))
-                datetime_str = f"{date} {time}"
-                datetime_obj = datetime.strptime(datetime_str, "%Y%m%d %H%M%S")
-                formatted_datetime = datetime_obj.strftime("%Y-%m-%d %H:%M:%S")
-                self.add_table_row(stock_code, date, formatted_datetime, open_price, high_price, low_price, close_price, volume)
+            try:
+                count = self.ocx.dynamicCall("GetRepeatCnt(QString, QString)", trcode, rqname)
+                print(f"Data count: {count}")
+                stock_code = self.selected_stock_codes[self.current_stock_index]
+                for i in range(count):
+                    date = self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "일자").strip()
+                    time = self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "체결시간").strip()
+                    open_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "시가").strip()))
+                    high_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "고가").strip()))
+                    low_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "저가").strip()))
+                    close_price = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "현재가").strip()))
+                    volume = abs(int(self.ocx.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, rqname, i, "거래량").strip()))
+                    print(f"Raw date: {date}, time: {time}")
+                    formatted_time = self.format_time(date, time)
+                    self.add_table_row(stock_code, date, formatted_time, open_price, high_price, low_price, close_price, volume)
 
-            if prevnext == '2':
-                self.request_candlestick_data(stock_code)
-            else:
-                self.current_stock_index += 1
-                if self.current_stock_index < len(self.selected_stock_codes):
-                    self.request_candlestick_data(self.selected_stock_codes[self.current_stock_index])
+                if prevnext == '2':
+                    self.request_candlestick_data(stock_code)
                 else:
-                    self.status_label.setText("Status: Completed retrieving data")
+                    self.current_stock_index += 1
+                    if self.current_stock_index < len(self.selected_stock_codes):
+                        self.request_candlestick_data(self.selected_stock_codes[self.current_stock_index])
+                    else:
+                        self.status_label.setText("Status: Completed retrieving data")
+            except Exception as e:
+                print(f"Error in _handler_receive_tr_data: {e}")
+
+    def format_time(self, date, time):
+        try:
+            print(f"Formatting time with date: {date}, time: {time}")
+            # Combine date and time strings and convert to desired format, removing extra spaces
+            datetime_str = f"{date.strip()}{time.strip()}"
+            print(f"Combined datetime string: {datetime_str}")
+            datetime_obj = datetime.strptime(datetime_str, "%Y%m%d%H%M%S")
+            formatted_time = datetime_obj.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"Formatted time: {formatted_time}")
+            return formatted_time
+        except Exception as e:
+            print(f"Error in format_time: {e}")
+            return ""
 
     def add_table_row(self, stock_code, date, time, open_price, high_price, low_price, close_price, volume):
+        print(f"Adding table row for stock_code: {stock_code}, date: {date}, time: {time}")
         row_position = self.table_widget.rowCount()
         self.table_widget.insertRow(row_position)
         self.table_widget.setItem(row_position, 0, QTableWidgetItem(stock_code))
@@ -139,6 +165,7 @@ class CandleDataRetrieverOpt10080(QMainWindow):
         self.table_widget.setItem(row_position, 7, QTableWidgetItem(str(volume)))
 
     def save_data_to_sqlite(self):
+        print("save_data_to_sqlite called")
         if self.conn is None:
             self.status_label.setText("Status: No SQLite file selected")
             return
