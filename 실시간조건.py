@@ -82,7 +82,7 @@ class MyWindow(QMainWindow):
             if code in self.tracked_stocks:
                 del self.tracked_stocks[code]
                 print(f"Deleted: {current_time} - {cond_name} {code} {type}")
-        print("Current tracked stocks:", self.tracked_stocks)
+        self.print_tracked_stocks()
 
     def GetConditionLoad(self):
         print("Loading conditions...")
@@ -116,6 +116,15 @@ class MyWindow(QMainWindow):
             self.SendCondition("100", cond_name, int(cond_index), 1)
         else:
             self.status_bar.showMessage("Please enter both condition name and index")
+
+    def print_tracked_stocks(self):
+        print("\nCurrent tracked stocks:")
+        if not self.tracked_stocks:
+            print("No tracked stocks.")
+        else:
+            for code, info in self.tracked_stocks.items():
+                print(f"  Code: {code}, First Seen: {info['first_seen']}, Condition Name: {info['cond_name']}")
+        print("-" * 40)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
