@@ -61,16 +61,18 @@ class MainWindow(QMainWindow):
         self.label_time.setText(f"현재시간: {display_text}")
 
     def update_capture_label(self, status, message):
-        self.label_capture.setText("")
-        self.label_capture.setText("========= 현재 조건을 만족하는 주식 코드 =========")
-        for line in message.split("\n"):
-            self.label_capture.setText(f"{self.label_capture.text()}\n{line}")
+        # 처음 포착된 시간과 종목코드만 출력
+        lines = message.split("\n")
+        if lines:
+            first_line = lines[0].strip()
+            code, timestamp = first_line.split(", ")
+            self.label_capture.setText(f"처음 포착된 시간: {timestamp}, 종목코드: {code}")
 
     def check_server_status(self):
         state = self.kiwoom_api.GetConnectState()
         if state == 1:
-            self.setWindowTitle("Kiwoom 실시간 조건식 테스트 - 서버: 온라인")
-            self.label_status.setText("서버: 온라인")
+            self.setWindowTitle("Kiwoom 실시간 조건식 테스트 - 서버 연결 중")
+            self.label_status.setText("서버에 연결 중입니다.")
         else:
             self.setWindowTitle("Kiwoom 실시간 조건식 테스트 - 서버 연결 끊김")
             self.label_status.setText("서버 연결이 끊어졌습니다.")
@@ -84,3 +86,16 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
+# 006 시가갭검색식_돌파
+# 002 9시 장초 돌파식
+# 003 당일 주도주 (9시 20분~)
+# 004 당일 주도주 후보 (9시~)
+# 005 돌파매매 단타
+# 000 90%이상 주장 단타
+# 001 단테오전장검색식
+# 007 주도주10분
+# 008 단테_아침단타
+# 009 test
+# 010 9시 바로매매
+# 011 장전검색
