@@ -36,10 +36,14 @@ class APIHandler():
         if type == 'I':
             if code not in self.tracked_stocks:
                 self.tracked_stocks[code] = {'first_seen': current_time, 'cond_name': cond_name}
+
+                # 구독 시작 (로그인 후에 설정)
+                self.SetRealReg("1000", ";".join(self.tracked_stocks), "20;10", 0)
+
                 print(f"Inserted: {current_time} - {cond_name} {code} {type}")
                 self.update_table_widget()
         self.print_tracked_stocks()
-
+              
     def GetConditionLoad(self):
         print("Loading conditions...")
         self.ocx.dynamicCall("GetConditionLoad()")
@@ -81,3 +85,50 @@ class APIHandler():
             for code, info in self.tracked_stocks.items():
                 print(f"  Code: {code}, First Seen: {info['first_seen']}, Condition Name: {info['cond_name']}")
         print("-" * 40)
+    def SetRealReg(self, screen_no, code_list, fid_list, real_type):
+        print(f"Setting real reg: {screen_no}, {code_list}, {fid_list}, {real_type}")
+        self.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)", 
+                              screen_no, code_list, fid_list, real_type)
+
+    def DisConnectRealData(self, screen_no):
+        print(f"Disconnecting real data: {screen_no}")
+        self.ocx.dynamicCall("DisConnectRealData(QString)", screen_no)
+
+    def GetCommRealData(self, code, fid):
+        data = self.ocx.dynamicCall("GetCommRealData(QString, int)", code, fid) 
+        print(f"GetCommRealData: {code}, {fid} -> {data}")
+        return data
+
+    def closeEvent(self, event):
+        self.DisConnectRealData("1000")
+        event.accept()
+
+    def _handler_real_data(self, code, real_type, data):
+        print(f"Received real data: {code}, {real_type}, {data}")
+        if real_type == "주식체결":
+            # 체결 시간
+            time = self.GetCommRealData(code, 20).strip()
+            date = datetime.datetime.now().strftime("%Y-%m-%d ")
+            try:
+                time = datetime.datetime.strptime(date + time, "%Y-%m-%d %H%M%S")
+
+                # 현재가
+                price = self.GetCommRealData(code, 10).strip()
+                price = price.replace('+', '').replace('-', '').replace(',', '')
+
+                # 가격이 숫자인지 확인하고 변환
+                if price.isdigit():
+                    price = int(price)
+                else:
+                    print(f"Invalid price data for {code}: {price}")
+                    return  # 유효하지 않은 데이터는 무시
+
+                # 데이터 추가
+                self.data[code].append((time, price))
+                if len(self.data[code]) > 100:  # 데이터 포인트가 100개를 넘으면 오래된 것부터 제거
+                    self.data[code].pop(0)
+
+                print(f"Data updated for {code}: {time}, {price}")
+            except Exception as e:
+                print(f"Error parsing data for {code}: {e}")
+  
