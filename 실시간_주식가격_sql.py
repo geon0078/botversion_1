@@ -17,13 +17,17 @@ class MyWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
 
-        self.ocx = QAxWidget("KHOPENAPI.KHOpenAPICtrl.1")
-        self.ocx.OnEventConnect.connect(self._handler_login)
-        self.ocx.OnReceiveRealData.connect(self._handler_real_data)
-        self.CommmConnect()
+        # Initialize SQLite connection and cursor
+        self.conn = sqlite3.connect('실시간db.db')
+        self.cur = self.conn.cursor()
 
-        # Fetch stock codes from database
-        self.stock_codes = self.fetch_stock_codes_from_db("20240717_시가갭검색식_돌파.db")
+        # 종목 코드 리스트
+        self.stock_codes = [
+            "005930", "000660", "035420", "452280", "092870", 
+            "002800", "373110", "003220", "014620", "024840", 
+            "053080", "290550", "214260", "175250", "291230", 
+            "220100", "018290"
+        ]  # 삼성전자, SK하이닉스, NAVER 예시
 
         # Matplotlib Figure와 Canvas 설정
         self.figures = {}
@@ -44,10 +48,18 @@ class MyWindow(QMainWindow):
             ax.set_xlabel("Time")
             ax.set_ylabel("Price")
 
-        # 타이머 설정 (1초마다 갱신)
+        # 타이머 설정 (3분마다 갱신)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_charts)
-        self.timer.start(1000)
+        self.timer.start(180000)  # 3 minutes in milliseconds
+
+        self.ocx = QAxWidget("KHOPENAPI.KHOpenAPICtrl.1")
+        self.ocx.OnEventConnect.connect(self._handler_login)
+        self.ocx.OnReceiveRealData.connect(self._handler_real_data)
+        self.CommmConnect()
+
+        # Create tables for each stock code in SQLite
+        self.create_tables()
 
     def CommmConnect(self):
         self.ocx.dynamicCall("CommConnect()")
@@ -65,17 +77,17 @@ class MyWindow(QMainWindow):
         print(f"Received real data: {code}, {real_type}, {data}")
         if real_type == "주식체결":
             # 체결 시간
-            time = self.GetCommRealData(code, 20).strip()
+            time_str = self.GetCommRealData(code, 20).strip()
             date = datetime.datetime.now().strftime("%Y-%m-%d ")
             try:
-                time = datetime.datetime.strptime(date + time, "%Y-%m-%d %H%M%S")
+                time = datetime.datetime.strptime(date + time_str, "%Y-%m-%d %H%M%S")
 
                 # 현재가
-                price = self.GetCommRealData(code, 10).strip()
-                price = price.replace('+', '').replace('-', '').replace(',', '')
+                price_str = self.GetCommRealData(code, 10).strip()
+                price = int(price_str.replace('+', '').replace('-', '').replace(',', ''))
 
                 # 가격이 숫자인지 확인하고 변환
-                if price.isdigit():
+                if isinstance(price, int):
                     price = int(price)
                 else:
                     print(f"Invalid price data for {code}: {price}")
@@ -83,12 +95,41 @@ class MyWindow(QMainWindow):
 
                 # 데이터 추가
                 self.data[code].append((time, price))
-                if len(self.data[code]) > 100:  # 데이터 포인트가 100개를 넘으면 오래된 것부터 제거
-                    self.data[code].pop(0)
 
-                print(f"Data updated for {code}: {time}, {price}")
+                # Check if 3 minutes have passed
+                if len(self.data[code]) >= 3:
+                    self.save_data_to_db(code, self.data[code])
+
             except Exception as e:
                 print(f"Error parsing data for {code}: {e}")
+
+
+    def save_data_to_db(self, code, data):
+        try:
+            table_name = f"stock_{code}"
+            
+            # Compute OHLC values
+            if data:
+                times, prices = zip(*data)
+                open_price = prices[0]
+                high_price = max(prices)
+                low_price = min(prices)
+                close_price = prices[-1]
+
+                # Save OHLC data to database
+                self.cur.execute(f'''
+                    INSERT OR REPLACE INTO {table_name} (time, open, high, low, close)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (times[0].strftime("%Y-%m-%d %H:%M:%S"), open_price, high_price, low_price, close_price))
+                self.conn.commit()
+                print(f"Saved OHLC data to {table_name} table: {times[0]}, {open_price}, {high_price}, {low_price}, {close_price}")
+
+                # Clear data list after saving OHLC
+                data.clear()
+
+        except Exception as e:
+            print(f"Error saving data to {table_name} table: {e}")
+
 
     def update_charts(self):
         for code in self.stock_codes:
@@ -118,23 +159,25 @@ class MyWindow(QMainWindow):
         print(f"GetCommRealData: {code}, {fid} -> {data}")
         return data
 
+    def create_tables(self):
+        # Create tables for each stock code in SQLite database
+        for code in self.stock_codes:
+            table_name = f"stock_{code}"
+            self.cur.execute(f'''
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    time TEXT PRIMARY KEY,
+                    open INTEGER,
+                    high INTEGER,
+                    low INTEGER,
+                    close INTEGER
+                )
+            ''')
+        self.conn.commit()
+
     def closeEvent(self, event):
         self.DisConnectRealData("1000")
+        self.conn.close()  # Close SQLite connection
         event.accept()
-
-    def fetch_stock_codes_from_db(self, db_file):
-        stock_codes = []
-        try:
-            conn = sqlite3.connect(db_file)
-            cursor = conn.cursor()
-            cursor.execute("SELECT code FROM tracked_stocks")
-            stock_codes = [row[0] for row in cursor.fetchall()]
-        except sqlite3.Error as e:
-            print(f"Error fetching stock codes from database: {e}")
-        finally:
-            if conn:
-                conn.close()
-        return stock_codes
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

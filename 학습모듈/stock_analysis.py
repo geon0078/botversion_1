@@ -2,6 +2,9 @@ import sqlite3
 import pandas as pd
 import mplfinance as mpf
 import re
+import os
+from datetime import datetime, timedelta  # Import datetime module
+
 
 class StockAnalyzer:
     def __init__(self, db_file):
@@ -24,20 +27,26 @@ class StockAnalyzer:
         tables = pd.read_sql_query(query, self.conn)
         return tables['name'].tolist()
 
-    def analyze_table(self, table_name):
-        query = f'SELECT * FROM "{table_name}" WHERE date LIKE "{self.date_str}%";'
-        df = pd.read_sql_query(query, self.conn)
+    def analyze_table(self, table_name, save_dir):
+        # Define time range: 9 AM to 10 AM
+        start_time = datetime.strptime(self.date_str + '090000', '%Y-%m-%d%H%M%S')
+        end_time = start_time + timedelta(hours=1)
+        
+        # Construct SQL query to fetch data within the specified time range
+        query = f'SELECT * FROM "{table_name}" WHERE date >= ? AND date < ?;'
+        df = pd.read_sql_query(query, self.conn, params=(start_time, end_time))
         
         if df.empty:
+            print(f"No data found for {table_name} between {start_time} and {end_time}")
             return
-
-        # 날짜 형식을 datetime으로 변환
+        
+        # Convert date format to datetime and set as index
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date', inplace=True)
-
-        # 1번째 봉의 시가와 종가
+        
+        # Perform candlestick pattern analysis and generate overlays
         first_open, first_close = df.iloc[0]['open'], df.iloc[0]['close']
-        print(f"{table_name}: 1번째 봉 시가 = {first_open}, 종가 = {first_close}")
+        last_close = df.iloc[-1]['close']
         
         # 첫 번째 봉부터 n번째 봉까지 (n은 1보다 크고 3보다 작음) 모두 양봉인지 확인
         all_bullish = True
@@ -61,8 +70,8 @@ class StockAnalyzer:
         one_price = last_close
         
         addplots = [
-            mpf.make_addplot(pd.Series([zero_price]*len(df), index=df.index), type='line', linestyle='--', color='b', label='0 Price'),
-            mpf.make_addplot(pd.Series([one_price]*len(df), index=df.index), type='line', linestyle='--', color='g', label='1 Price')
+            mpf.make_addplot(pd.Series([zero_price]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='b', label='0 Price'),
+            mpf.make_addplot(pd.Series([one_price]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='g', label='1 Price')
         ]
 
         if no_buy:
@@ -75,21 +84,30 @@ class StockAnalyzer:
             price_0786 = zero_price + 0.786 * (one_price - zero_price)
             price_1618 = zero_price + 1.618 * (one_price - zero_price)
             
-            addplots.append(mpf.make_addplot(pd.Series([buy_price]*len(df), index=df.index), type='line', linestyle='--', color='r', label='Buy Order (0.382)'))
-            addplots.append(mpf.make_addplot(pd.Series([price_0786]*len(df), index=df.index), type='line', linestyle='--', color='purple', label='0.786 Price'))
-            addplots.append(mpf.make_addplot(pd.Series([price_1618]*len(df), index=df.index), type='line', linestyle='--', color='orange', label='1.618 Price'))
+            addplots.append(mpf.make_addplot(pd.Series([buy_price]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='r', label='Buy Order (0.382)'))
+            addplots.append(mpf.make_addplot(pd.Series([price_0786]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='purple', label='0.786 Price'))
+            addplots.append(mpf.make_addplot(pd.Series([price_1618]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='orange', label='1.618 Price'))
 
-        mpf.plot(df, type='candle', addplot=addplots, title=f"{table_name} - {self.date_str}", style='charles', ylabel='Price')
+        # Save the plot
+        os.makedirs(save_dir, exist_ok=True)
+        filename = f"{table_name}.jpg"
+        file_path = os.path.join(save_dir, filename)
+        
+        mpf.plot(df, type='candle', addplot=addplots, title=f"{table_name} - {self.date_str}", style='charles', ylabel='Price', savefig=file_path, figscale=2.0, tight_layout=True)
+        print(f"{table_name} analysis saved to {file_path}")
 
-    def analyze_all(self):
+
+    def analyze_all(self, save_dir):
         for table_name in self.tables:
-            self.analyze_table(table_name)
+            self.analyze_table(table_name, save_dir)
 
     def close_connection(self):
         self.conn.close()
 
 if __name__ == "__main__":
-    db_file = '20240717_시가갭검색식_돌파.db'
+    db_file = '20240716_시가갭검색식_돌파.db'
+    save_dir = os.path.join(os.path.dirname(db_file), "진입가예측")
+    
     analyzer = StockAnalyzer(db_file)
-    analyzer.analyze_all()
+    analyzer.analyze_all(save_dir)
     analyzer.close_connection()

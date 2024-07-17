@@ -49,7 +49,7 @@ class DBVisualizer:
 
                 save_path = f'./{self.charts_folder}/{selected_table}.jpg'
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                savefig_options = {'fname': save_path, 'dpi': 100}
+                savefig_options = {'fname': save_path, 'dpi': 800}
 
                 fig, ax = mpf.plot(df, type='candle', style='charles', title=title, volume=True, returnfig=True)
                 fig.set_size_inches(10, 6)
