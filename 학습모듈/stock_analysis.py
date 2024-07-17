@@ -89,7 +89,7 @@ class StockAnalyzer:
         self.conn.close()
 
 if __name__ == "__main__":
-    db_file = '20240716_시가갭검색식_돌파.db'
+    db_file = '20240717_시가갭검색식_돌파.db'
     analyzer = StockAnalyzer(db_file)
     analyzer.analyze_all()
     analyzer.close_connection()

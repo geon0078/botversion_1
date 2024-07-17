@@ -7,7 +7,7 @@ import re
 import matplotlib.pyplot as plt
 
 class DBVisualizer:
-    def __init__(self, db_name, num_records=400):
+    def __init__(self, db_name, num_records=200):
         self.db_name = db_name
         self.db_path = f'{db_name}.db'
         self.charts_folder = db_name
@@ -65,6 +65,6 @@ class DBVisualizer:
 
 # Example usage
 if __name__ == "__main__":
-    db_name = '20240716_시가갭검색식_돌파'
+    db_name = '20240717_시가갭검색식_돌파'
     visualizer = DBVisualizer(db_name)
     visualizer.visualize_all()

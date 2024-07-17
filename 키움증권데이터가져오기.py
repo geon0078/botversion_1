@@ -69,7 +69,7 @@ class StockDataUpdater:
             conn.close()
 
 # 사용 예제
-db_path = '20240716_시가갭검색식_돌파.db'
+db_path = '20240717_시가갭검색식_돌파.db'
 tick_ranges = [1, 3, 5, 30]
 updater = StockDataUpdater(db_path, tick_ranges)
 updater.update_stock_data()
