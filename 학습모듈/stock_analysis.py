@@ -48,11 +48,16 @@ class StockAnalyzer:
         first_open, first_close = df.iloc[0]['open'], df.iloc[0]['close']
         last_close = df.iloc[-1]['close']
         
-        # 첫 번째 봉부터 n번째 봉까지 (n은 1보다 크고 3보다 작음) 모두 양봉인지 확인
+        # 첫 번째 봉이 양봉인지 확인
+        if first_close <= first_open:
+            print(f"{table_name}: 첫 번째 봉이 양봉이 아닙니다. 매수하지 않습니다.")
+            return
+
+        # 첫 번째 봉부터 n번째 봉까지 (n은 1보다 크고 5보다 작음) 모두 양봉인지 확인
         all_bullish = True
         last_close = first_close
         for i in range(1, min(5, len(df))):
-            if df.iloc[i]['close'] <= df.iloc[i]['open']:
+            if df.iloc[i]['close'] < df.iloc[i]['open']:
                 all_bullish = False
                 print(f"{table_name}: {i+1}번째 봉은 양봉이 아닙니다. 시가 = {df.iloc[i]['open']}, 종가 = {df.iloc[i]['close']}")
                 break
@@ -70,8 +75,8 @@ class StockAnalyzer:
         one_price = last_close
         
         addplots = [
-            mpf.make_addplot(pd.Series([zero_price]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='b', label='0 Price'),
-            mpf.make_addplot(pd.Series([one_price]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='g', label='1 Price')
+            mpf.make_addplot(pd.Series([zero_price]*len(df), index=df.index), type='line', linestyle='-', width=2, color='b', label='0 Price'),
+            mpf.make_addplot(pd.Series([one_price]*len(df), index=df.index), type='line', linestyle='-', width=2, color='g', label='1 Price')
         ]
 
         if no_buy:
@@ -84,9 +89,9 @@ class StockAnalyzer:
             price_0786 = zero_price + 0.786 * (one_price - zero_price)
             price_1618 = zero_price + 1.618 * (one_price - zero_price)
             
-            addplots.append(mpf.make_addplot(pd.Series([buy_price]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='r', label='Buy Order (0.382)'))
-            addplots.append(mpf.make_addplot(pd.Series([price_0786]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='purple', label='0.786 Price'))
-            addplots.append(mpf.make_addplot(pd.Series([price_1618]*len(df), index=df.index), type='line', linestyle='-', width=0.5, color='orange', label='1.618 Price'))
+            addplots.append(mpf.make_addplot(pd.Series([buy_price]*len(df), index=df.index), type='line', linestyle='-', width=1, color='r', label='Buy Order (0.382)'))
+            addplots.append(mpf.make_addplot(pd.Series([price_0786]*len(df), index=df.index), type='line', linestyle='-', width=1, color='purple', label='0.786 Price'))
+            addplots.append(mpf.make_addplot(pd.Series([price_1618]*len(df), index=df.index), type='line', linestyle='-', width=1, color='orange', label='1.618 Price'))
 
         # Save the plot
         os.makedirs(save_dir, exist_ok=True)
