@@ -10,6 +10,7 @@ class APIHandler():
         self.ocx.OnEventConnect.connect(self._handler_login)
         self.ocx.OnReceiveConditionVer.connect(self._handler_condition_load)
         self.ocx.OnReceiveRealCondition.connect(self._handler_real_condition)
+        self.ocx.OnReceiveRealData.connect(self._receive_real_data)
 
         self.tracked_stocks = {}
         self.current_condition_name = ""
@@ -81,3 +82,16 @@ class APIHandler():
             for code, info in self.tracked_stocks.items():
                 print(f"  Code: {code}, First Seen: {info['first_seen']}, Condition Name: {info['cond_name']}")
         print("-" * 40)
+
+    def subscribe_market_start(self):
+        self.ocx.dynamicCall("SetRealReg(QString, QString, QString, QString)", "1000", "", "215", "0")
+
+    def _receive_real_data(self, jongmok_code, real_type, real_data):
+        if real_type == "장시작시간":
+            market_start_time = self.ocx.dynamicCall("GetCommRealData(QString, int)", jongmok_code, 215).strip()
+            if market_start_time == "0":
+                print("장 시작 전")
+            elif market_start_time == "2":
+                print("장 종료, 시간 외 매매 시작")
+            elif market_start_time == "3":
+                print("시간 외 매매 종료")
