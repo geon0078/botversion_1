@@ -14,6 +14,7 @@ class APIHandler():
 
         self.tracked_stocks = {}
         self.current_condition_name = ""
+        self.data = {}
 
     def CommConnect(self):
         print("Attempting to connect...")
@@ -40,6 +41,38 @@ class APIHandler():
                 print(f"Inserted: {current_time} - {cond_name} {code} {type}")
                 self.update_table_widget()
         self.print_tracked_stocks()
+
+    def _handler_real_data(self, code, real_type, data):
+        print(f"Received real data: {code}, {real_type}, {data}")
+        if real_type == "주식체결":
+            # 체결 시간
+            time_str = self.GetCommRealData(code, 20).strip()
+            date = datetime.datetime.now().strftime("%Y-%m-%d ")
+            try:
+                time = datetime.datetime.strptime(date + time_str, "%Y-%m-%d %H%M%S")
+
+                # 현재가
+                price_str = self.GetCommRealData(code, 10).strip()
+                price = int(price_str.replace('+', '').replace('-', '').replace(',', ''))
+
+                print("code : ", code, "price : ", price)
+
+
+                # 가격이 숫자인지 확인하고 변환
+                if isinstance(price, int):
+                    price = int(price)
+                else:
+                    print(f"Invalid price data for {code}: {price}")
+                    return  # 유효하지 않은 데이터는 무시
+
+                # # 데이터 추가
+                self.data[code].append((time, price))
+                if len(self.data[code]) > 100:  # 데이터 포인트가 100개를 넘으면 오래된 것부터 제거
+                    self.data[code].pop(0)
+
+            except Exception as e:
+                print(f"Error parsing data for {code}: {e}")
+
 
     def GetConditionLoad(self):
         print("Loading conditions...")
